@@ -7,7 +7,7 @@ const {
 } = require("@whiskeysockets/baileys");
 
 async function startWhatsAppConnection(onMessageReceived) {
-  const sessionPath = path.join(__dirname, "../auth");
+  const sessionPath = "/app/auth";
 
   console.log("🧹 Checking for old session files...");
   if (fs.existsSync(sessionPath)) {
