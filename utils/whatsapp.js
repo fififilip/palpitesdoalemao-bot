@@ -1,56 +1,70 @@
-                               ^
- 
-ReferenceError: useMultiFileAuthState is not defined
-    at startWhatsAppConnection (/app/utils/whatsapp.js:22:32)
-    at Object.<anonymous> (/app/index.js:6:1)
-    at Module._compile (node:internal/modules/cjs/loader:1364:14)
-    at Module._extensions..js (node:internal/modules/cjs/loader:1422:10)
-    at Module.load (node:internal/modules/cjs/loader:1203:32)
-    at Module._load (node:internal/modules/cjs/loader:1019:12)
-    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:128:12)
-    at node:internal/main/run_main_module:28:49
- 
-Node.js v18.20.5
-Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/a4d44500-c321-4229-abbb-bdf540579455/vol_72b61fedt2bx2era
-npm warn config production Use `--omit=dev` instead.
- 
-> node index.js
- 
-/app/utils/whatsapp.js:22
+const fs = require("fs");
+const path = require("path");
+const {
+  default: makeWASocket,
+  useMultiFileAuthState,
+  DisconnectReason,
+} = require("@whiskeysockets/baileys");
+
+const sessionPath = path.join(__dirname, "../auth");
+
+// 🧼 Fully clear auth folder, skipping system folders like "lost+found"
+if (fs.existsSync(sessionPath)) {
+  const entries = fs.readdirSync(sessionPath);
+  entries.forEach(entry => {
+    const entryPath = path.join(sessionPath, entry);
+    const stats = fs.lstatSync(entryPath);
+
+    if (stats.isFile()) {
+      fs.unlinkSync(entryPath);
+    } else if (stats.isDirectory() && entry !== "lost+found") {
+      fs.rmSync(entryPath, { recursive: true, force: true });
+    }
+  });
+}
+
+async function startWhatsAppConnection(onMessageReceived) {
   const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
-ReferenceError: useMultiFileAuthState is not defined
-    at startWhatsAppConnection (/app/utils/whatsapp.js:22:32)
-    at Object.<anonymous> (/app/index.js:6:1)
-    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:128:12)
-    at node:internal/main/run_main_module:28:49
- 
-Node.js v18.20.5
-Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/a4d44500-c321-4229-abbb-bdf540579455/vol_72b61fedt2bx2era
-npm warn config production Use `--omit=dev` instead.
- 
-> palpitesdoalemao-bot@1.0.0 start
-> node index.js
- 
-/app/utils/whatsapp.js:22
-  const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
-                               ^
- 
-ReferenceError: useMultiFileAuthState is not defined
-    at startWhatsAppConnection (/app/utils/whatsapp.js:22:32)
-    at Object.<anonymous> (/app/index.js:6:1)
-    at Module._compile (node:internal/modules/cjs/loader:1364:14)
-    at Module._extensions..js (node:internal/modules/cjs/loader:1422:10)
-    at Module.load (node:internal/modules/cjs/loader:1203:32)
-    at Module._load (node:internal/modules/cjs/loader:1019:12)
-    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:128:12)
-    at node:internal/main/run_main_module:28:49
- 
-Node.js v18.20.5
-Mounting volume on: /var/lib/containers/railwayapp/bind-mounts/a4d44500-c321-4229-abbb-bdf540579455/vol_72b61fedt2bx2era
-npm warn config production Use `--omit=dev` instead.
- 
-> palpitesdoalemao-bot@1.0.0 start
-> node index.js
- 
-/app/utils/whatsapp.js:22
-  const { state, saveCreds } = await useMultiFileAuthSta
+
+  const sock = makeWASocket({
+    auth: state,
+    printQRInTerminal: true,
+  });
+
+  sock.ev.on("creds.update", saveCreds);
+
+  sock.ev.on("messages.upsert", async ({ messages }) => {
+    const msg = messages[0];
+    console.log("Incoming message from:", msg.key.remoteJid);
+
+    if (!msg.key.fromMe && msg.message?.conversation) {
+      await onMessageReceived(msg.message.conversation);
+    }
+  });
+
+  sock.ev.on("connection.update", (update) => {
+    const { connection, lastDisconnect } = update;
+
+    if (connection === "close") {
+      const shouldReconnect =
+        lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
+
+      if (shouldReconnect) {
+        console.log("🔁 Reconnecting to WhatsApp...");
+        startWhatsAppConnection(onMessageReceived);
+      } else {
+        console.log("🚫 Logged out. Please restart and scan QR again.");
+      }
+    }
+
+    if (connection === "open") {
+      console.log("✅ WhatsApp connection established.");
+    }
+
+    if (update.qr) {
+      console.log("📱 Scan this QR code with your WhatsApp app to connect.");
+    }
+  });
+}
+
+module.exports = { startWhatsAppConnection };
