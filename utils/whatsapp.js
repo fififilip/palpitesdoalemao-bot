@@ -27,4 +27,10 @@ async function startWhatsAppConnection(onMessageReceived) {
     if (connection === "close") {
       const shouldReconnect = (lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut);
       if (shouldReconnect) {
-        startWhatsApp
+        startWhatsAppConnection(onMessageReceived); // 🔁 reconnect on disconnect
+      }
+    }
+  });
+}
+
+module.exports = { startWhatsAppConnection };
