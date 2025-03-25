@@ -1,15 +1,20 @@
 const fs = require("fs");
 const path = require("path");
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require("@whiskeysockets/baileys");
+const {
+  default: makeWASocket,
+  useMultiFileAuthState,
+  DisconnectReason,
+} = require("@whiskeysockets/baileys");
 
 async function startWhatsAppConnection(onMessageReceived) {
   const sessionPath = path.join(__dirname, "../auth");
 
-  console.log("⚠️ Clearing old session files from", sessionPath);
+  console.log("🧹 Checking for old session files...");
   if (fs.existsSync(sessionPath)) {
     fs.readdirSync(sessionPath).forEach(file => {
       const filePath = path.join(sessionPath, file);
-      if (fs.lstatSync(filePath).isFile()) {
+      if (fs.lstatSync(filePath).isFile() && file.endsWith(".json")) {
+        console.log("🗑️ Removing", filePath);
         fs.unlinkSync(filePath);
       }
     });
@@ -27,6 +32,7 @@ async function startWhatsAppConnection(onMessageReceived) {
   sock.ev.on("messages.upsert", async ({ messages }) => {
     const msg = messages[0];
     if (!msg.key.fromMe && msg.message?.conversation) {
+      console.log("📩 Incoming message:", msg.message.conversation);
       await onMessageReceived(msg.message.conversation);
     }
   });
@@ -35,7 +41,8 @@ async function startWhatsAppConnection(onMessageReceived) {
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
-      console.log("📱 Scan this QR code to connect your WhatsApp");
+      console.log("📱 Scan this QR code to connect WhatsApp:");
+      console.log(qr);
     }
 
     if (connection === "close") {
@@ -44,12 +51,16 @@ async function startWhatsAppConnection(onMessageReceived) {
         console.log("🔁 Reconnecting to WhatsApp...");
         startWhatsAppConnection(onMessageReceived);
       } else {
-        console.log("❌ Disconnected from WhatsApp");
+        console.log("❌ Logged out from WhatsApp");
       }
+    }
+
+    if (connection === "open") {
+      console.log("✅ WhatsApp connection opened");
     }
   });
 
-  console.log("✅ connected to WA");
+  console.log("🔌 WhatsApp client started");
 }
 
 module.exports = { startWhatsAppConnection };
