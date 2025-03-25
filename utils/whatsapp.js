@@ -1,4 +1,4 @@
-const crypto = require("crypto");
+const crypto = require("crypto-browserify");
 const fs = require("fs");
 const path = require("path");
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require("@whiskeysockets/baileys");
