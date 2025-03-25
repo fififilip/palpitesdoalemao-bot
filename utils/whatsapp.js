@@ -1,10 +1,11 @@
+const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require("@whiskeysockets/baileys");
 
-const sessionPath = "/app/auth"; // this must match Railway's volume mount
-console.log("🧹 Checking for old session files...");
+const sessionPath = "/app/auth";
 
+console.log("🧹 Checking for old session files...");
 if (fs.existsSync(sessionPath)) {
   fs.readdirSync(sessionPath).forEach(file => {
     const filePath = path.join(sessionPath, file);
