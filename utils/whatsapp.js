@@ -1,8 +1,7 @@
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require("@whiskeysockets/baileys");
 const path = require("path");
+const sessionPath = path.join(__dirname, "../auth"); // ✅ matches /app/auth
 
-const sessionId = Date.now().toString(); // Creates a unique folder each time
-const sessionPath = path.join(__dirname, `../auth/${sessionId}`);
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require("@whiskeysockets/baileys");
 
 async function startWhatsAppConnection(onMessageReceived) {
   const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
@@ -16,12 +15,9 @@ async function startWhatsAppConnection(onMessageReceived) {
 
   sock.ev.on("messages.upsert", async ({ messages }) => {
     const msg = messages[0];
-    console.log("Incoming message from:", msg.key.remoteJid); // Shows group ID
+    console.log("Incoming message from:", msg.key.remoteJid);
 
-    if (
-      !msg.key.fromMe &&
-      msg.message?.conversation
-    ) {
+    if (!msg.key.fromMe && msg.message?.conversation) {
       await onMessageReceived(msg.message.conversation);
     }
   });
@@ -31,7 +27,7 @@ async function startWhatsAppConnection(onMessageReceived) {
     if (connection === "close") {
       const shouldReconnect = (lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut);
       if (shouldReconnect) {
-        startWhatsAppConnection(onMessageReceived); // Reconnect on disconnect
+        startWhatsAppConnection(onMessageReceived);
       }
     }
   });
