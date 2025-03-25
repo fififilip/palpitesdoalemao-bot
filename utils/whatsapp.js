@@ -8,21 +8,6 @@ const {
 
 const sessionPath = path.join(__dirname, "../auth");
 
-// 🧼 Delete everything in /auth (including subfolders), except "lost+found"
-if (fs.existsSync(sessionPath)) {
-  const entries = fs.readdirSync(sessionPath);
-  entries.forEach(entry => {
-    const entryPath = path.join(sessionPath, entry);
-    const stats = fs.lstatSync(entryPath);
-
-    if (stats.isFile()) {
-      fs.unlinkSync(entryPath);
-    } else if (stats.isDirectory() && entry !== "lost+found") {
-      fs.rmSync(entryPath, { recursive: true, force: true });
-    }
-  });
-}
-
 async function startWhatsAppConnection(onMessageReceived) {
   const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
 
