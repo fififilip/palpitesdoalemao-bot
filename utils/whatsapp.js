@@ -1,16 +1,22 @@
 const fs = require("fs");
 const path = require("path");
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require("@whiskeysockets/baileys");
+const {
+  default: makeWASocket,
+  useMultiFileAuthState,
+  DisconnectReason,
+} = require("@whiskeysockets/baileys");
 
 const sessionPath = path.join(__dirname, "../auth");
 
-// 🧼 Clean corrupted auth folder if necessary
+// 🧼 Clean up old session files (but skip folders like lost+found)
 if (fs.existsSync(sessionPath)) {
   const files = fs.readdirSync(sessionPath);
-  if (files.length > 0) {
-    console.log("⚠️ Clearing old session files from /auth");
-    files.forEach(file => fs.unlinkSync(path.join(sessionPath, file)));
-  }
+  files.forEach(file => {
+    const filePath = path.join(sessionPath, file);
+    if (fs.lstatSync(filePath).isFile()) {
+      fs.unlinkSync(filePath);
+    }
+  });
 }
 
 async function startWhatsAppConnection(onMessageReceived) {
@@ -18,7 +24,7 @@ async function startWhatsAppConnection(onMessageReceived) {
 
   const sock = makeWASocket({
     auth: state,
-    printQRInTerminal: true
+    printQRInTerminal: true,
   });
 
   sock.ev.on("creds.update", saveCreds);
@@ -35,9 +41,10 @@ async function startWhatsAppConnection(onMessageReceived) {
   sock.ev.on("connection.update", (update) => {
     const { connection, lastDisconnect } = update;
     if (connection === "close") {
-      const shouldReconnect = (lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut);
+      const shouldReconnect =
+        lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
       if (shouldReconnect) {
-        startWhatsAppConnection(onMessageReceived);
+        startWhatsAppConnection(onMessageReceived); // recursive retry
       }
     }
   });
