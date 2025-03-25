@@ -6,7 +6,7 @@ const {
   DisconnectReason,
 } = require("@whiskeysockets/baileys");
 
-const sessionPath = path.join(__dirname, "../session");
+const sessionPath = path.join(__dirname, "../auth");
 
 async function startWhatsAppConnection(onMessageReceived) {
   const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
