@@ -1,27 +1,18 @@
 const fs = require("fs");
 const path = require("path");
-const {
-  default: makeWASocket,
-  useMultiFileAuthState,
-  DisconnectReason,
-} = require("@whiskeysockets/baileys");
 
 const sessionPath = path.join(__dirname, "../auth");
 
-// 🧼 Fully clear auth folder, skipping system folders like "lost+found"
+// ❗ Completely delete and recreate the auth directory
 if (fs.existsSync(sessionPath)) {
   const entries = fs.readdirSync(sessionPath);
   entries.forEach(entry => {
     const entryPath = path.join(sessionPath, entry);
-    const stats = fs.lstatSync(entryPath);
-
-    if (stats.isFile()) {
-      fs.unlinkSync(entryPath);
-    } else if (stats.isDirectory() && entry !== "lost+found") {
-      fs.rmSync(entryPath, { recursive: true, force: true });
-    }
+    fs.rmSync(entryPath, { recursive: true, force: true });
+    fs.mkdirSync(sessionPath);
   });
 }
+
 
 async function startWhatsAppConnection(onMessageReceived) {
   const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
