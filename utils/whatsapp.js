@@ -3,7 +3,7 @@ const path = require("path");
 const crypto = require("crypto");
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require("@whiskeysockets/baileys");
 
-const sessionPath = "/app/auth"; // Make sure this matches your mounted volume
+const sessionPath = path.join(__dirname, "../auth"); // Make sure this matches your mounted volume
 
 console.log("🧹 Checking for old session files...");
 if (fs.existsSync(sessionPath)) {
