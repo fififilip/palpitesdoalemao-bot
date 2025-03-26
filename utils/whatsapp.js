@@ -14,14 +14,10 @@ const sessionPath = path.join(__dirname, "../auth");
 // Optional: clean up broken app state files that may cause sync errors
 console.log("🧹 Checking for old corrupted app state files...");
 if (fs.existsSync(sessionPath)) {
-  fs.readdirSync(sessionPath).forEach((file) => {
-    const filePath = path.join(sessionPath, file);
-    if (file.startsWith("app-state-")) {
-      console.log(`🗑 Removing corrupted app state: ${file}`);
-      fs.unlinkSync(filePath);
-    }
-  });
+  console.log("🗑 Removing entire session folder to fix sync errors...");
+  fs.rmSync(sessionPath, { recursive: true, force: true });
 }
+
 
 async function startWhatsAppConnection(onMessageReceived) {
   const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
