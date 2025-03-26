@@ -10,14 +10,9 @@ const {
 
 const sessionPath = path.join(__dirname, "../auth");
 
-console.log("🧹 Checking for old session files...");
-if (fs.existsSync(sessionPath)) {
-  fs.readdirSync(sessionPath).forEach((file) => {
-    const filePath = path.join(sessionPath, file);
-    if (fs.lstatSync(filePath).isFile()) {
-      fs.unlinkSync(filePath);
-    }
-  });
+// Don't delete session files every time!
+if (!fs.existsSync(sessionPath)) {
+  fs.mkdirSync(sessionPath, { recursive: true });
 }
 
 async function startWhatsAppConnection(onMessageReceived) {
@@ -26,6 +21,7 @@ async function startWhatsAppConnection(onMessageReceived) {
   const sock = makeWASocket({
     auth: state,
     browser: ["Ubuntu", "Chrome", "22.04.4"],
+    printQRInTerminal: true,
   });
 
   console.log("🔌 WhatsApp client started");
@@ -34,8 +30,25 @@ async function startWhatsAppConnection(onMessageReceived) {
 
   sock.ev.on("messages.upsert", async ({ messages }) => {
     const msg = messages[0];
-    if (!msg.key.fromMe && msg.message?.conversation) {
-      await onMessageReceived(msg.message.conversation);
+    const content = msg?.message?.conversation || msg?.message?.extendedTextMessage?.text;
+
+    const senderJid = msg?.key?.remoteJid || "";
+    const isGroup = senderJid.endsWith("@g.us");
+
+    // Optional: Filter only messages from a specific group
+    const allowedGroupJid = process.env.WHATSAPP_GROUP_ID; // Add this to your .env
+
+    if (!msg.key.fromMe && content) {
+      if (!isGroup || senderJid === allowedGroupJid) {
+        console.log(`📥 Message received from ${senderJid}: ${content}`);
+        try {
+          await onMessageReceived(content);
+        } catch (err) {
+          console.error("❌ Error processing message:", err.message);
+        }
+      } else {
+        console.log(`⚠️ Ignored message from another group: ${senderJid}`);
+      }
     }
   });
 
@@ -47,16 +60,15 @@ async function startWhatsAppConnection(onMessageReceived) {
 
     if (connection === "close") {
       const shouldReconnect =
-        lastDisconnect?.error?.output?.statusCode !==
-        DisconnectReason.loggedOut;
+        lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
       if (shouldReconnect) {
         console.log("🔁 Reconnecting to WhatsApp...");
         startWhatsAppConnection(onMessageReceived);
       } else {
-        console.log("❌ Disconnected:", lastDisconnect?.error);
+        console.log("❌ Disconnected from WhatsApp:", lastDisconnect?.error);
       }
     } else if (connection === "open") {
-      console.log("✅ connected to WA");
+      console.log("✅ Connected to WhatsApp");
     }
   });
 }
