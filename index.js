@@ -1,7 +1,7 @@
 const { default: makeWASocket, useMultiFileAuthState } = require('@whiskeysockets/baileys');
 const fetch = require('node-fetch');
 const dotenv = require('dotenv');
-const { Configuration, OpenAIApi } = require('openai');
+const OpenAI = require('openai');
 
 dotenv.config();
 
@@ -11,11 +11,9 @@ const {
   OPENAI_API_KEY,
 } = process.env;
 
-const TARGET_WHATSAPP_GROUP = '120363399350692551@g.us';
-
-const openai = new OpenAIApi(new Configuration({
+const openai = new OpenAI({
   apiKey: OPENAI_API_KEY,
-}));
+});
 
 async function translateText(text) {
   try {
