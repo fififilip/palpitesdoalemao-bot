@@ -1,79 +1,92 @@
-require('dotenv').config();
-const { makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion, DisconnectReason } = require('@whiskeysockets/baileys');
-const qrcode = require('qrcode-terminal');
-const fetch = require('node-fetch');
-const { OpenAI } = require('openai');
+import makeWASocket, { useMultiFileAuthState } from '@whiskeysockets/baileys';
+import fetch from 'node-fetch';
+import * as dotenv from 'dotenv';
+import { Configuration, OpenAIApi } from 'openai';
 
-// Load from .env
-const SOURCE_GROUP_ID = process.env.SOURCE_GROUP_ID;
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const openaiModel = process.env.OPENAI_MODEL || 'gpt-3.5-turbo';
+dotenv.config();
 
-const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+const {
+  TELEGRAM_BOT_TOKEN,
+  TELEGRAM_CHAT_ID,
+  OPENAI_API_KEY,
+} = process.env;
 
-async function startWhatsAppBot() {
-  const { state, saveCreds } = await useMultiFileAuthState('auth_info');
+const TARGET_WHATSAPP_GROUP = '120363399350692551@g.us';
 
-  const { version } = await fetchLatestBaileysVersion();
+const openai = new OpenAIApi(new Configuration({
+  apiKey: OPENAI_API_KEY,
+}));
+
+async function translateText(text) {
+  try {
+    const response = await openai.createChatCompletion({
+      model: 'gpt-3.5-turbo',
+      messages: [
+        {
+          role: 'system',
+          content: 'Translate everything into natural English. Do not reply, only translate.',
+        },
+        { role: 'user', content: text },
+      ],
+    });
+
+    return response.data.choices[0].message.content.trim();
+  } catch (error) {
+    console.error('Translation error:', error);
+    return '⚠️ Error translating message.';
+  }
+}
+
+async function sendToTelegram(text) {
+  const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+  const payload = {
+    chat_id: TELEGRAM_CHAT_ID,
+    text,
+  };
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      console.error('Telegram send error:', await res.text());
+    }
+  } catch (error) {
+    console.error('Telegram send error:', error);
+  }
+}
+
+async function startBot() {
+  const { state, saveCreds } = await useMultiFileAuthState('auth');
+
   const sock = makeWASocket({
-    version,
-    printQRInTerminal: true,
     auth: state,
+    printQRInTerminal: true,
+    syncFullHistory: false,
+    shouldSyncHistoryMessage: false,
   });
 
   sock.ev.on('creds.update', saveCreds);
 
-  sock.ev.on('connection.update', (update) => {
-    const { connection, lastDisconnect } = update;
-    if (connection === 'close') {
-      const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-      console.log('Connection closed. Reconnecting...', shouldReconnect);
-      if (shouldReconnect) {
-        startWhatsAppBot();
-      }
-    } else if (connection === 'open') {
-      console.log('✅ Connected to WhatsApp');
-    }
-  });
+  sock.ev.on('messages.upsert', async ({ messages, type }) => {
+    if (!messages || type !== 'notify') return;
 
-  sock.ev.on('messages.upsert', async ({ messages }) => {
-    const msg = messages[0];
-    if (!msg || !msg.message || msg.key.remoteJid !== SOURCE_GROUP_ID || msg.key.fromMe) return;
+    for (const msg of messages) {
+      if (msg.key.remoteJid !== TARGET_WHATSAPP_GROUP) return;
+      const body = msg.message?.conversation;
+      if (!body) return;
 
-    try {
-      const textMessage = msg.message?.conversation || msg.message?.extendedTextMessage?.text;
-      if (!textMessage) return;
+      console.log('Received:', body);
 
-      console.log(`💬 New message: ${textMessage}`);
+      const translated = await translateText(body);
+      console.log('Translated:', translated);
 
-      // Call GPT
-      const response = await openai.chat.completions.create({
-        model: openaiModel,
-        messages: [{ role: 'user', content: textMessage }],
-      });
-
-      const gptReply = response.choices[0]?.message?.content?.trim();
-
-      if (gptReply) {
-        console.log(`🤖 GPT reply: ${gptReply}`);
-
-        // Send to Telegram
-        const telegramUrl = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
-        await fetch(telegramUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id: TELEGRAM_CHAT_ID,
-            text: gptReply,
-          }),
-        });
-      }
-    } catch (err) {
-      console.error('❌ Error processing message:', err.message);
+      await sendToTelegram(translated);
     }
   });
 }
 
-startWhatsAppBot();
+startBot();
