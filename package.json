@@ -15,7 +15,7 @@
     "node-fetch": "^2.6.7",
     "qrcode-terminal": "^0.12.0",
     "openai": "^4.20.0",
-    "messaging-api-telegram": "^2.3.0",
+    "messaging-api-telegram": "^2.2.0",
     "pino": "^8.14.1"
   }
 }
