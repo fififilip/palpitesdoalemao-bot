@@ -1,7 +1,7 @@
-import makeWASocket, { useMultiFileAuthState } from '@whiskeysockets/baileys';
-import fetch from 'node-fetch';
-import * as dotenv from 'dotenv';
-import { Configuration, OpenAIApi } from 'openai';
+const { default: makeWASocket, useMultiFileAuthState } = require('@whiskeysockets/baileys');
+const fetch = require('node-fetch');
+const dotenv = require('dotenv');
+const { Configuration, OpenAIApi } = require('openai');
 
 dotenv.config();
 
