@@ -2,6 +2,7 @@ const { default: makeWASocket, useMultiFileAuthState } = require('@whiskeysocket
 const fetch = require('node-fetch');
 const dotenv = require('dotenv');
 const OpenAI = require('openai');
+const fs = require('fs');
 
 dotenv.config();
 
@@ -9,6 +10,7 @@ const {
   TELEGRAM_BOT_TOKEN,
   TELEGRAM_CHAT_ID,
   OPENAI_API_KEY,
+  TARGET_WHATSAPP_GROUP,
 } = process.env;
 
 const openai = new OpenAI({
@@ -22,7 +24,7 @@ async function translateText(text) {
       messages: [
         {
           role: 'system',
-          content: 'Translate everything into natural English. Do not reply, only translate.',
+          content: 'Translate everything into natural Brazilian Portuguese, the way a Brazilian would write it. Do not reply, only translate.',
         },
         { role: 'user', content: text },
       ],
@@ -30,7 +32,7 @@ async function translateText(text) {
 
     return response.data.choices[0].message.content.trim();
   } catch (error) {
-    console.error('Translation error:', error);
+    console.error('⚠️ Translation error:', error?.response?.data || error.message);
     return '⚠️ Error translating message.';
   }
 }
@@ -50,10 +52,10 @@ async function sendToTelegram(text) {
     });
 
     if (!res.ok) {
-      console.error('Telegram send error:', await res.text());
+      console.error('⚠️ Telegram send error:', await res.text());
     }
   } catch (error) {
-    console.error('Telegram send error:', error);
+    console.error('⚠️ Telegram send error:', error.message);
   }
 }
 
@@ -65,9 +67,21 @@ async function startBot() {
     printQRInTerminal: true,
     syncFullHistory: false,
     shouldSyncHistoryMessage: false,
+
+    // 🧠 Spoofing a more realistic browser fingerprint
+    browser: ['Windows', 'Chrome', '110.0.0.0'],
   });
 
   sock.ev.on('creds.update', saveCreds);
+
+  sock.ev.on('connection.update', (update) => {
+    const { connection, lastDisconnect } = update;
+    if (connection === 'close') {
+      console.log('❌ Connection closed:', lastDisconnect?.error?.message || 'unknown reason');
+    } else if (connection === 'open') {
+      console.log('✅ Connected to WhatsApp');
+    }
+  });
 
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     if (!messages || type !== 'notify') return;
@@ -77,10 +91,10 @@ async function startBot() {
       const body = msg.message?.conversation;
       if (!body) return;
 
-      console.log('Received:', body);
+      console.log('📩 Received:', body);
 
       const translated = await translateText(body);
-      console.log('Translated:', translated);
+      console.log('🌍 Translated:', translated);
 
       await sendToTelegram(translated);
     }
